@@ -1,94 +1,167 @@
-# Pokémon App
+// Install the Ionic CLI if not already installed:
+// npm install -g @ionic/cli
 
-Esta es una aplicación móvil desarrollada con Ionic Framework (Angular) que lista Pokémon utilizando la PokeAPI. La aplicación incluye scroll infinito, diseño responsive y una vista detallada para cada Pokémon.
+// Create a new Ionic app:
+// ionic start pokemon-app blank --type=angular
 
-## Características
+// Navigate to the app folder:
+// cd pokemon-app
 
-- **Listado de Pokémon:** Muestra una lista de Pokémon con su imagen y nombre.
-- **Scroll Infinito:** Carga progresiva de 20 elementos por vez.
-- **Vista Detallada:** Información detallada de cada Pokémon, incluyendo:
-  - Imagen
-  - Nombre
-  - Altura
-  - Peso
-  - Tipos
-  - Estadísticas base
-- **Diseño Responsive:** Optimizado para dispositivos móviles y tablets.
-- **Manejo de Estado:** Control eficiente del estado de la aplicación.
-- **Gestión de Errores:** Manejo de errores para fallos en la API.
+// Install Axios for API requests:
+// npm install axios
 
-## Tecnologías Utilizadas
+// Generate a new page for the list and details:
+// ionic generate page pages/pokemon-list
+// ionic generate page pages/pokemon-details
 
-- **Ionic Framework** (Angular)
-- **TypeScript**
-- **Axios** para consumo de la API RESTful
-- **PokeAPI** como fuente de datos
+// App Code:
 
-## Instalación
+// src/app/pages/pokemon-list/pokemon-list.page.ts
+import { Component, OnInit } from '@angular/core';
+import axios from 'axios';
+import { NavController } from '@ionic/angular';
 
-1. Asegúrate de tener instalado Node.js y NPM.
-2. Instala Ionic CLI globalmente:
-   ```bash
-   npm install -g @ionic/cli
-   ```
-3. Clona este repositorio:
-   ```bash
-   git clone https://github.com/tu-usuario/pokemon-app.git
-   ```
-4. Ve al directorio del proyecto:
-   ```bash
-   cd pokemon-app
-   ```
-5. Instala las dependencias:
-   ```bash
-   npm install
-   ```
-6. Inicia la aplicación:
-   ```bash
-   ionic serve
-   ```
+@Component({
+  selector: 'app-pokemon-list',
+  templateUrl: './pokemon-list.page.html',
+  styleUrls: ['./pokemon-list.page.scss'],
+})
+export class PokemonListPage implements OnInit {
+  pokemons: any[] = [];
+  offset: number = 0;
+  limit: number = 20;
+  isLoading: boolean = false;
 
-## Estructura del Proyecto
+  constructor(private navCtrl: NavController) {}
 
-```
-src/
-├── app/
-│   ├── pages/
-│   │   ├── pokemon-list/       # Página de listado de Pokémon
-│   │   ├── pokemon-details/    # Página de detalles de Pokémon
-│   ├── app-routing.module.ts   # Rutas de la aplicación
-│   ├── app.module.ts          # Configuración principal
-├── assets/                     # Recursos estáticos
-├── environments/               # Configuraciones de entorno
-```
+  ngOnInit() {
+    this.loadPokemons();
+  }
 
-## Uso
+  async loadPokemons(event?: any) {
+    this.isLoading = true;
+    try {
+      const response = await axios.get(
+        `https://pokeapi.co/api/v2/pokemon?offset=${this.offset}&limit=${this.limit}`
+      );
+      const loadedPokemons = response.data.results.map((pokemon: any, index: number) => ({
+        name: pokemon.name,
+        image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${this.offset + index + 1}.png`,
+        id: this.offset + index + 1,
+      }));
+      this.pokemons = [...this.pokemons, ...loadedPokemons];
+      this.offset += this.limit;
+    } catch (error) {
+      console.error('Error fetching Pokémon:', error);
+    } finally {
+      this.isLoading = false;
+      if (event) {
+        event.target.complete();
+      }
+    }
+  }
 
-### Listado de Pokémon
-- Abre la aplicación para ver una lista de Pokémon.
-- Haz scroll hacia abajo para cargar más elementos.
+  openDetails(pokemon: any) {
+    this.navCtrl.navigateForward(`/pokemon-details`, {
+      queryParams: { id: pokemon.id },
+    });
+  }
+}
 
-### Vista Detallada
-- Haz clic en cualquier Pokémon para ver información detallada sobre él.
+// src/app/pages/pokemon-list/pokemon-list.page.html
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Pokémon List</ion-title>
+  </ion-toolbar>
+</ion-header>
 
-## Capturas de Pantalla
+<ion-content>
+  <ion-list>
+    <ion-item *ngFor="let pokemon of pokemons" (click)="openDetails(pokemon)">
+      <ion-thumbnail slot="start">
+        <img [src]="pokemon.image" alt="{{ pokemon.name }}" />
+      </ion-thumbnail>
+      <ion-label>{{ pokemon.name | titlecase }}</ion-label>
+    </ion-item>
+  </ion-list>
 
-_Agrega aquí capturas de pantalla de la aplicación funcionando en diferentes dispositivos._
+  <ion-infinite-scroll threshold="100px" (ionInfinite)="loadPokemons($event)">
+    <ion-infinite-scroll-content
+      loadingSpinner="bubbles"
+      loadingText="Loading more Pokémon...">
+    </ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+</ion-content>
 
-## Notas
+// src/app/pages/pokemon-details/pokemon-details.page.ts
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import axios from 'axios';
 
-- La aplicación carga inicialmente los primeros 20 Pokémon. El scroll infinito permite cargar más hasta el Pokémon número 1200.
-- Las imágenes de los Pokémon se obtienen directamente desde la PokeAPI.
+@Component({
+  selector: 'app-pokemon-details',
+  templateUrl: './pokemon-details.page.html',
+  styleUrls: ['./pokemon-details.page.scss'],
+})
+export class PokemonDetailsPage implements OnInit {
+  pokemon: any;
+  isLoading: boolean = true;
 
-## Recursos
+  constructor(private route: ActivatedRoute) {}
 
-- **PokeAPI:** [https://pokeapi.co/](https://pokeapi.co/)
-- **Ionic Framework:** [https://ionicframework.com/](https://ionicframework.com/)
+  async ngOnInit() {
+    const id = this.route.snapshot.queryParamMap.get('id');
+    if (id) {
+      await this.fetchPokemonDetails(id);
+    }
+  }
 
-## Autor
+  async fetchPokemonDetails(id: string) {
+    try {
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`);
+      const data = response.data;
+      this.pokemon = {
+        name: data.name,
+        image: data.sprites.front_default,
+        height: data.height,
+        weight: data.weight,
+        types: data.types.map((type: any) => type.type.name),
+        stats: data.stats.map((stat: any) => ({
+          name: stat.stat.name,
+          value: stat.base_stat,
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching Pokémon details:', error);
+    } finally {
+      this.isLoading = false;
+    }
+  }
+}
 
-Desarrollado por [Tu Nombre].
+// src/app/pages/pokemon-details/pokemon-details.page.html
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ pokemon?.name | titlecase }}</ion-title>
+  </ion-toolbar>
+</ion-header>
 
----
-
-¡Gracias por probar esta aplicación! Si tienes preguntas o sugerencias, no dudes en abrir un issue en el repositorio.
+<ion-content *ngIf="!isLoading">
+  <ion-card>
+    <img [src]="pokemon?.image" alt="{{ pokemon?.name }}" />
+    <ion-card-header>
+      <ion-card-title>{{ pokemon?.name | titlecase }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p><strong>Height:</strong> {{ pokemon?.height }}</p>
+      <p><strong>Weight:</strong> {{ pokemon?.weight }}</p>
+      <p><strong>Types:</strong> {{ pokemon?.types.join(', ') }}</p>
+      <h3>Base Stats:</h3>
+      <ul>
+        <li *ngFor="let stat of pokemon?.stats">
+          {{ stat.name | titlecase }}: {{ stat.value }}
+        </li>
+      </ul>
+    </ion-card-content>
+  </ion-card>
+</ion-content>
