@@ -1,167 +1,124 @@
-// Install the Ionic CLI if not already installed:
-// npm install -g @ionic/cli
-
-// Create a new Ionic app:
-// ionic start pokemon-app blank --type=angular
-
-// Navigate to the app folder:
-// cd pokemon-app
-
-// Install Axios for API requests:
-// npm install axios
-
-// Generate a new page for the list and details:
-// ionic generate page pages/pokemon-list
-// ionic generate page pages/pokemon-details
-
-// App Code:
-
-// src/app/pages/pokemon-list/pokemon-list.page.ts
-import { Component, OnInit } from '@angular/core';
+PokemonList.js
+import React, { useState, useEffect } from 'react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonThumbnail, IonLabel, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/react';
 import axios from 'axios';
-import { NavController } from '@ionic/angular';
+import { useHistory } from 'react-router-dom';
 
-@Component({
-  selector: 'app-pokemon-list',
-  templateUrl: './pokemon-list.page.html',
-  styleUrls: ['./pokemon-list.page.scss'],
-})
-export class PokemonListPage implements OnInit {
-  pokemons: any[] = [];
-  offset: number = 0;
-  limit: number = 20;
-  isLoading: boolean = false;
+const PokemonList = () => {
+  const [pokemons, setPokemons] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const limit = 20;
+  const history = useHistory();
 
-  constructor(private navCtrl: NavController) {}
+  useEffect(() => {
+    fetchPokemons();
+  }, []);
 
-  ngOnInit() {
-    this.loadPokemons();
-  }
-
-  async loadPokemons(event?: any) {
-    this.isLoading = true;
+  const fetchPokemons = async (event) => {
     try {
-      const response = await axios.get(
-        `https://pokeapi.co/api/v2/pokemon?offset=${this.offset}&limit=${this.limit}`
-      );
-      const loadedPokemons = response.data.results.map((pokemon: any, index: number) => ({
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`);
+      const newPokemons = response.data.results.map((pokemon, index) => ({
         name: pokemon.name,
-        image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${this.offset + index + 1}.png`,
-        id: this.offset + index + 1,
+        image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${offset + index + 1}.png`,
+        id: offset + index + 1,
       }));
-      this.pokemons = [...this.pokemons, ...loadedPokemons];
-      this.offset += this.limit;
+      setPokemons((prev) => [...prev, ...newPokemons]);
+      setOffset((prevOffset) => prevOffset + limit);
     } catch (error) {
       console.error('Error fetching Pokémon:', error);
-    } finally {
-      this.isLoading = false;
-      if (event) {
-        event.target.complete();
-      }
     }
-  }
+    if (event) event.target.complete();
+  };
 
-  openDetails(pokemon: any) {
-    this.navCtrl.navigateForward(`/pokemon-details`, {
-      queryParams: { id: pokemon.id },
-    });
-  }
-}
+  return (
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Pokémon List</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent>
+        <IonList>
+          {pokemons.map((pokemon) => (
+            <IonItem key={pokemon.id} button onClick={() => history.push(`/pokemon/${pokemon.id}`)}>
+              <IonThumbnail slot="start">
+                <img src={pokemon.image} alt={pokemon.name} />
+              </IonThumbnail>
+              <IonLabel>{pokemon.name}</IonLabel>
+            </IonItem>
+          ))}
+        </IonList>
+        <IonInfiniteScroll threshold="100px" onIonInfinite={fetchPokemons}>
+          <IonInfiniteScrollContent loadingText="Loading more Pokémon..." />
+        </IonInfiniteScroll>
+      </IonContent>
+    </IonPage>
+  );
+};
 
-// src/app/pages/pokemon-list/pokemon-list.page.html
-<ion-header>
-  <ion-toolbar>
-    <ion-title>Pokémon List</ion-title>
-  </ion-toolbar>
-</ion-header>
+export default PokemonList;
 
-<ion-content>
-  <ion-list>
-    <ion-item *ngFor="let pokemon of pokemons" (click)="openDetails(pokemon)">
-      <ion-thumbnail slot="start">
-        <img [src]="pokemon.image" alt="{{ pokemon.name }}" />
-      </ion-thumbnail>
-      <ion-label>{{ pokemon.name | titlecase }}</ion-label>
-    </ion-item>
-  </ion-list>
-
-  <ion-infinite-scroll threshold="100px" (ionInfinite)="loadPokemons($event)">
-    <ion-infinite-scroll-content
-      loadingSpinner="bubbles"
-      loadingText="Loading more Pokémon...">
-    </ion-infinite-scroll-content>
-  </ion-infinite-scroll>
-</ion-content>
-
-// src/app/pages/pokemon-details/pokemon-details.page.ts
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+// src/pages/PokemonDetails.js
+import React, { useState, useEffect } from 'react';
+import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent } from '@ionic/react';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
-@Component({
-  selector: 'app-pokemon-details',
-  templateUrl: './pokemon-details.page.html',
-  styleUrls: ['./pokemon-details.page.scss'],
-})
-export class PokemonDetailsPage implements OnInit {
-  pokemon: any;
-  isLoading: boolean = true;
+const PokemonDetails = () => {
+  const { id } = useParams();
+  const [pokemon, setPokemon] = useState(null);
 
-  constructor(private route: ActivatedRoute) {}
+  useEffect(() => {
+    fetchPokemonDetails();
+  }, []);
 
-  async ngOnInit() {
-    const id = this.route.snapshot.queryParamMap.get('id');
-    if (id) {
-      await this.fetchPokemonDetails(id);
-    }
-  }
-
-  async fetchPokemonDetails(id: string) {
+  const fetchPokemonDetails = async () => {
     try {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`);
       const data = response.data;
-      this.pokemon = {
+      setPokemon({
         name: data.name,
         image: data.sprites.front_default,
         height: data.height,
         weight: data.weight,
-        types: data.types.map((type: any) => type.type.name),
-        stats: data.stats.map((stat: any) => ({
-          name: stat.stat.name,
-          value: stat.base_stat,
-        })),
-      };
+        types: data.types.map((type) => type.type.name),
+        stats: data.stats.map((stat) => ({ name: stat.stat.name, value: stat.base_stat })),
+      });
     } catch (error) {
       console.error('Error fetching Pokémon details:', error);
-    } finally {
-      this.isLoading = false;
     }
-  }
-}
+  };
 
-// src/app/pages/pokemon-details/pokemon-details.page.html
-<ion-header>
-  <ion-toolbar>
-    <ion-title>{{ pokemon?.name | titlecase }}</ion-title>
-  </ion-toolbar>
-</ion-header>
+  return (
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>{pokemon?.name || 'Loading...'}</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent>
+        {pokemon && (
+          <IonCard>
+            <img src={pokemon.image} alt={pokemon.name} />
+            <IonCardHeader>
+              <IonCardTitle>{pokemon.name}</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <p><strong>Height:</strong> {pokemon.height}</p>
+              <p><strong>Weight:</strong> {pokemon.weight}</p>
+              <p><strong>Types:</strong> {pokemon.types.join(', ')}</p>
+              <h3>Base Stats:</h3>
+              <ul>
+                {pokemon.stats.map((stat) => (
+                  <li key={stat.name}>{stat.name}: {stat.value}</li>
+                ))}
+              </ul>
+            </IonCardContent>
+          </IonCard>
+        )}
+      </IonContent>
+    </IonPage>
+  );
+};
 
-<ion-content *ngIf="!isLoading">
-  <ion-card>
-    <img [src]="pokemon?.image" alt="{{ pokemon?.name }}" />
-    <ion-card-header>
-      <ion-card-title>{{ pokemon?.name | titlecase }}</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <p><strong>Height:</strong> {{ pokemon?.height }}</p>
-      <p><strong>Weight:</strong> {{ pokemon?.weight }}</p>
-      <p><strong>Types:</strong> {{ pokemon?.types.join(', ') }}</p>
-      <h3>Base Stats:</h3>
-      <ul>
-        <li *ngFor="let stat of pokemon?.stats">
-          {{ stat.name | titlecase }}: {{ stat.value }}
-        </li>
-      </ul>
-    </ion-card-content>
-  </ion-card>
-</ion-content>
+export default PokemonDetails;
